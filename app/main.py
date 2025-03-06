@@ -1,5 +1,4 @@
 from openai import OpenAI, AsyncOpenAI
-import re
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.exceptions import RequestValidationError
@@ -7,10 +6,13 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
+from services.schedule_appointment import handle_appointment_workflow
+from services.ask_question import process_question
+from services.detect_intent import detect_intent
+import json
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: str = " "
+    OPENAI_API_KEY: str = ""
     VECTOR_STORE_ID: str = ""
     VECTOR_STORE_ID_PATIENT: str = ""
     ASSISTANT_ID_PATIENT: str = ""
@@ -24,10 +26,10 @@ async_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"], 
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 # Custom exception handler
@@ -39,7 +41,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 # Token authentication
-
 def token_authentication(authorization: Optional[str] = Header(None)):
     if authorization is None or authorization != "Bearer U6P9tG5m8iY387Z9QN7LAFld":
         raise HTTPException(status_code=401, detail="Invalid or missing token")
@@ -64,41 +65,70 @@ async def setup_assistant(request: SetupAssistantRequest, auth: bool = Depends(t
 
 class AskQuestionRequest(BaseModel):
     question: str
-    assistant_id: Optional[str] = settings.ASSISTANT_ID_PROVIDER
+    assistant_id: Optional[str]
+    is_clinician: Optional[bool] = False
     thread: Dict[str, str]
 
+# Store conversation history per thread (session tracking)
+
+conversation_store = {}  # Tracks conversation history
+workflow_store = {}  # Tracks active workflow per thread
+
 @app.post("/ask_question")
-async def ask_question(request: AskQuestionRequest, auth: bool = Depends(token_authentication)):
-    question = request.question
-    thread = request.thread
-    assistant_id = request.assistant_id
+async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda: True)):
+    thread_id = request.thread["id"]
 
-    client.beta.threads.messages.create(
-        thread_id=thread["id"],
-        role="user",
-        content=question
-    )
+    # Initialize session tracking if not exists
+    if thread_id not in conversation_store:
+        conversation_store[thread_id] = []
+    if thread_id not in workflow_store:
+        workflow_store[thread_id] = None  # No active workflow at start
 
-    run = client.beta.threads.runs.create(
-        thread_id=thread["id"],
-        assistant_id=assistant_id
-    )
+    user_input = request.question.strip().lower()
 
-    while run.status != "completed":
-        await asyncio.sleep(1)
-        run = client.beta.threads.runs.retrieve(
-            thread_id=thread["id"],
-            run_id=run.id
-        )
+    if workflow_store[thread_id] == "appointment":
+        response_data = handle_appointment_workflow(user_input)
+        
+        if response_data.get("is_api_call", False):  
+            workflow_store[thread_id] = None  
+        
+        return json.dumps(response_data) 
+    
+    if workflow_store[thread_id] == "general_question":
+        intent = await detect_intent(user_input)  
 
-    messages = client.beta.threads.messages.list(
-        thread_id=thread["id"],
-        order="desc"
-    )
+        if intent == "appointment_booking":
+            workflow_store[thread_id] = "appointment"  
+            return json.dumps(handle_appointment_workflow("Book an Appointment"))  
 
-    resp = messages.data[0].content[0].text.value
-    resp = re.sub(r'【.*?】', '', resp)
-    return {"response": resp}
+        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
+        return json.dumps(response_data)  
+
+    # Detect intent only if no active workflow
+    intent = await detect_intent(user_input)
+
+    if intent == "appointment_booking":
+        workflow_store[thread_id] = "appointment" 
+        return json.dumps(handle_appointment_workflow("Book an Appointment"))  
+    
+    elif intent == "general_question":
+        workflow_store[thread_id] = "general_question"  
+        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
+        return json.dumps(response_data)  
+
+    # Default: Show greeting options again if unclear
+    response_data = {
+        "Message": "Hello! What would you like to do today?",
+        "input_type": "options",
+        "Options": [
+            {"Id": 1, "Option": "Schedule an Appointment"},
+            {"Id": 2, "Option": "Ask a question about health or obesity"}
+        ]
+    }
+    return json.dumps(response_data)  
+
+
+
 
 @app.post("/get_stream_response")
 async def assistant_stream(request: AskQuestionRequest, auth: bool = Depends(token_authentication)):
@@ -121,6 +151,7 @@ async def assistant_stream(request: AskQuestionRequest, auth: bool = Depends(tok
 
             async with stream as response_stream:
                 async for event in response_stream.text_deltas:
+                    yield f"data: {event}\n\n"
                     yield f"{event}\n\n"
 
         except Exception as e:

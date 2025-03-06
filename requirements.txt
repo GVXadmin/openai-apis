@@ -1,5 +1,0 @@
-fastapi
-openai
-pydantic
-pydantic-settings
-uvicorn
