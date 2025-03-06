@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
-from services.schedule_appointment import handle_appointment_workflow
-from services.ask_question import process_question
-from services.detect_intent import detect_intent
+from app.services.schedule_appointment import handle_appointment_workflow
+from app.services.ask_question import process_question
+from app.services.detect_intent import detect_intent
 import json
 
 class Settings(BaseSettings):
