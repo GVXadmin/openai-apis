@@ -1,3 +1,4 @@
+import os
 from openai import OpenAI, AsyncOpenAI
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -12,11 +13,11 @@ from app.services.detect_intent import detect_intent
 import json
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: str = ""
-    VECTOR_STORE_ID: str = ""
-    VECTOR_STORE_ID_PATIENT: str = ""
-    ASSISTANT_ID_PATIENT: str = ""
-    ASSISTANT_ID_PROVIDER: str = ""
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    VECTOR_STORE_ID: str = os.getenv("VECTOR_STORE_ID")
+    VECTOR_STORE_ID_PATIENT: str = os.getenv("VECTOR_STORE_ID_PATIENT")
+    ASSISTANT_ID_PATIENT: str = os.getenv("ASSISTANT_ID_PATIENT")
+    ASSISTANT_ID_PROVIDER: str = os.getenv("ASSISTANT_ID_PROVIDER")
 
 settings = Settings()
 app = FastAPI()
