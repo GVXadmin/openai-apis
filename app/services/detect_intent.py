@@ -16,16 +16,17 @@ client = AzureOpenAI(
 )
 
 async def detect_intent(user_input: str) -> str:
-    """
-    Uses GPT to classify user input into an intent category.
-    """
     prompt = [
         {"role": "system", "content": (
             "You are an AI assistant that detects user intent. "
             "Classify the given input into one of these categories:\n"
             "- 'appointment_booking': If the user wants to book an appointment, see/consult a doctor/physician/specialist, book a medical visit.\n"
-            "- 'general_question': If the user is asking a health-related question.\n"
-            "- 'unclear': If the input is a greeting, small talk, or ambiguous.\n"
+            "- 'general_question': If the user is asking about health, obesity, fitness, nutrition, or medical concerns.\n"
+            "- 'unclear': If the input is a salutation, greeting (hi, hello, hey there, yo, sup), small talk, or ambiguous.\n\n"
+            "**Examples:**\n"
+            "- 'I need to see a doctor','help me book a visit to doc!' → appointment_booking\n"
+            "- 'Ask a question about health or obesity','Can I lose weight by running?' → general_question\n"
+            "- 'Hello, are you a bot?','Yo, wassup!' → unclear\n"
             "Respond with only one of these three labels and nothing else."
         )},
         {"role": "user", "content": f"User input: {user_input}"}
@@ -41,10 +42,8 @@ async def detect_intent(user_input: str) -> str:
             max_tokens=10
         )
     )
-
     intent = completion.choices[0].message.content.strip().lower()
 
-    # Ensure valid output
     if intent not in ["appointment_booking", "general_question", "unclear"]:
         return "unclear"
     

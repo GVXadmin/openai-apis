@@ -87,7 +87,7 @@ def get_preferred_time():
 
 def get_preferred_date():
     return {
-        "Message": "Do you have a specific date in mind? Please enter the date in MM/DD/YYYY format.",
+        "Message": "Do you have a specific date in mind? Please enter the date in MM/DD/YYYY format.\n Note: The date must be at least 7 days from today and no more than 21 days ahead.",
         "question_id": "preferred_date",
         "Prompt": "",
         "input_type": "text",
@@ -96,7 +96,7 @@ def get_preferred_date():
 
 def get_special_requirement():
     return {
-        "Message": "Do you have any special requests for your appointment?",
+        "Message": "Do you have any special requests for your appointment?.",
         "question_id": "special_requirement",
         "Prompt": "",
         "Options": [
@@ -139,13 +139,14 @@ def handle_appointment_workflow(user_response: str):
     
     elif "preferred_time" not in user_appointment:
         valid_times = [
-        "monday am", "monday pm", "tuesday am", "tuesday pm",
-        "wednesday am", "wednesday pm", "thursday am", "thursday pm",
-        "friday am", "friday pm"
-    ]
-        if user_response.lower() not in valid_times:
+            "monday am", "monday pm", "tuesday am", "tuesday pm",
+            "wednesday am", "wednesday pm", "thursday am", "thursday pm",
+            "friday am", "friday pm"
+        ]
+        selected_times = [time.strip().lower() for time in user_response.split(",")]
+        if not all(time in valid_times for time in selected_times):
             return get_preferred_time()  
-        user_appointment["preferred_time"] = user_response
+        user_appointment["preferred_time"] = ", ".join(selected_times) 
         return get_preferred_date()
     
     elif "preferred_date" not in user_appointment:

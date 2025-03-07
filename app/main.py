@@ -75,6 +75,8 @@ class AskQuestionRequest(BaseModel):
 conversation_store = {}  # Tracks conversation history
 workflow_store = {}  # Tracks active workflow per thread
 
+QUESTION_PHRASES = {"ask a question about health or obesity", "ask a question", "i have a question", "i need help", "i need assistance", "can you assist me?", "i need some info"}
+
 @app.post("/ask_question")
 async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda: True)):
     thread_id = request.thread["id"]
@@ -87,23 +89,39 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
 
     user_input = request.question.strip().lower()
 
+    if user_input in QUESTION_PHRASES:
+        workflow_store[thread_id] = "general_question"
+        return json.dumps({
+            "Message": "Sure! Go ahead, how can I assist you today?",
+            "input_type": "text"
+        })
+
     if workflow_store[thread_id] == "appointment":
         response_data = handle_appointment_workflow(user_input)
         
         if response_data.get("is_api_call", False):  
-            workflow_store[thread_id] = None  
+            workflow_store[thread_id] = None  # Reset flow after appointment is finalized
         
         return json.dumps(response_data) 
     
     if workflow_store[thread_id] == "general_question":
         intent = await detect_intent(user_input)  
-
+        # If user suddenly wants to book an appointment mid-conversation, the assistant should switch to the appointment workflow
         if intent == "appointment_booking":
             workflow_store[thread_id] = "appointment"  
             return json.dumps(handle_appointment_workflow("Book an Appointment"))  
-
+        # If user suddenly switches to small talk, salutation or greeting
+        if intent == "unclear":
+            return json.dumps({
+                "Message": "Hello! How may I assist you today?",
+                "input_type": "options",
+                "Options": [
+                    {"Id": 1, "Option": "Schedule an Appointment"},
+                    {"Id": 2, "Option": "Ask a question about health or obesity"}
+                ]
+            })
         response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
-        return json.dumps(response_data)  
+        return json.dumps(response_data)   
 
     # Detect intent only if no active workflow
     intent = await detect_intent(user_input)
@@ -117,7 +135,8 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
         response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
         return json.dumps(response_data)  
 
-    # Default: Show greeting options again if unclear
+    # Note for later: introduce multi-intent check, if a user gives a response that can be interpreted as both appointment booking and general question
+    # Default: Show greeting options again if intent is unclear
     response_data = {
         "Message": "Hello! What would you like to do today?",
         "input_type": "options",
@@ -127,9 +146,6 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
         ]
     }
     return json.dumps(response_data)  
-
-
-
 
 @app.post("/get_stream_response")
 async def assistant_stream(request: AskQuestionRequest, auth: bool = Depends(token_authentication)):
