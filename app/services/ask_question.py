@@ -54,7 +54,7 @@ async def process_question(question: str, is_clinician: bool, conversation_histo
             "You are an AI assistant designed to help patients by providing accurate and reliable answers. "
             "You must strictly rely on the provided context from the vector store. "
             "If the context does not contain relevant information, DO NOT generate a response. "
-            "Instead, respond with: 'I\'m not yet able to answer this question. If you need immediate medical advice please contact your physician.'\n"
+            "Instead, respond with: I'm not yet able to answer this question. If you need immediate medical advice please contact your physician.\n"
             "Here is the retrieved context:\n\n" + context_text
         )
     }]
