@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
-from services.schedule_appointment import handle_appointment_workflow
-from services.ask_question import process_question
-from services.detect_intent import detect_intent, detect_source
+from app.services.schedule_appointment import handle_appointment_workflow
+from app.services.ask_question import process_question
+from app.services.detect_intent import detect_intent, detect_source
 import json
 
 class Settings(BaseSettings):
@@ -86,7 +86,7 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
     if thread_id not in workflow_store:
         workflow_store[thread_id] = None  # No active workflow at start
 
-    user_input = request.question.strip().lower()
+    user_input = request.question.strip()
 
     if user_input in QUESTION_PHRASES:
         workflow_store[thread_id] = "general_question"
