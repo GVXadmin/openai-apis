@@ -1,6 +1,6 @@
 import os
 import asyncio
-from openai import AzureOpenAI  # Ensure OpenAI client is properly configured
+from openai import AzureOpenAI 
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -48,3 +48,29 @@ async def detect_intent(user_input: str) -> str:
         return "unclear"
     
     return intent
+
+async def detect_source(user_input: str) -> str:
+    prompt = [
+        {"role": "system", "content": (
+            "You are an AI assistant that classifies which source of medical knowledge best matches the user's question. "
+            "Choose one of the following sources:\n"
+            "- 'general': For general medical knowledge, health and obesity conditions or questions.\n"
+            "- 'wlp': For weekly care plans, weight loss care plans, routines, structured obesity programs.\n"
+            "Only respond with the source label. Do not include explanations."
+        )},
+        {"role": "user", "content": f"{user_input}"}
+    ]
+
+    loop = asyncio.get_running_loop()
+    completion = await loop.run_in_executor(
+        None,
+        lambda: client.chat.completions.create(
+            messages=prompt,
+            model="gpt-4o",
+            temperature=0,
+            max_tokens=10
+        )
+    )
+
+    source = completion.choices[0].message.content.strip().lower()
+    return source if source in {"general", "wlp"} else "general"
