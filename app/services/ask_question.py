@@ -87,7 +87,7 @@ async def process_question(
             "You are an AI assistant designed to help patients by providing accurate and reliable answers. "
             "You must strictly rely on the provided context from the vector store. "
             "If the context does not contain relevant information, DO NOT generate a response. "
-            "Instead, respond with: 'I do not have the necessary context in my knowledge base. Please contact customer support for further assistance.'\n"
+            "Instead, respond with: 'I do not have the necessary context in my knowledge base, and so I'm not yet able to answer that question. If you need immediate medical advice, please contact your physician.'\n"
             "Here is the retrieved context:\n\n" + context_text
         )
     }]
