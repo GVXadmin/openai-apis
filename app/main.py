@@ -86,7 +86,7 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
     if thread_id not in workflow_store:
         workflow_store[thread_id] = None  # No active workflow at start
 
-    user_input = request.question.strip().lower()
+    user_input = request.question.strip()
 
     if user_input in QUESTION_PHRASES:
         workflow_store[thread_id] = "general_question"
