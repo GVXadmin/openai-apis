@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.schedule_appointment import handle_appointment_workflow
-from app.services.ask_question import process_question
-from app.services.detect_intent import detect_intent
+from services.schedule_appointment import handle_appointment_workflow
+from services.ask_question import process_question
+from services.detect_intent import detect_intent, detect_source
 import json
 
 class Settings(BaseSettings):
@@ -70,10 +70,9 @@ class AskQuestionRequest(BaseModel):
     is_clinician: Optional[bool] = False
     thread: Dict[str, str]
 
-# Store conversation history per thread (session tracking)
-
 conversation_store = {}  # Tracks conversation history
 workflow_store = {}  # Tracks active workflow per thread
+source_store = {}
 
 QUESTION_PHRASES = {"ask a question about health or obesity", "ask a question", "i have a question", "i need help", "i need assistance", "can you assist me?", "i need some info"}
 
@@ -87,7 +86,7 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
     if thread_id not in workflow_store:
         workflow_store[thread_id] = None  # No active workflow at start
 
-    user_input = request.question.strip()
+    user_input = request.question.strip().lower()
 
     if user_input in QUESTION_PHRASES:
         workflow_store[thread_id] = "general_question"
@@ -120,7 +119,17 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
                     {"Id": 2, "Option": "Ask a question about health or obesity"}
                 ]
             })
-        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
+        
+        if thread_id not in source_store:
+            source_store[thread_id] = "general"
+
+        if source_store[thread_id] == "general":
+            source_store[thread_id] = await detect_source(user_input)
+
+        source = source_store[thread_id]
+        # print("Source selected:", source)
+
+        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id], source)
         return json.dumps(response_data)   
 
     # Detect intent only if no active workflow
@@ -132,7 +141,8 @@ async def ask_question(request: AskQuestionRequest, auth: bool = Depends(lambda:
     
     elif intent == "general_question":
         workflow_store[thread_id] = "general_question"  
-        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id])
+        source = await detect_source(user_input)
+        response_data = await process_question(user_input, request.is_clinician, conversation_store[thread_id], source)
         return json.dumps(response_data)  
 
     # Note for later: introduce multi-intent check, if a user gives a response that can be interpreted as both appointment booking and general question
