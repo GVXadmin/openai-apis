@@ -5,7 +5,7 @@ from langchain_openai import AzureOpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from openai import AzureOpenAI
 from dotenv import load_dotenv
-from services.resources import WEEKLY_RESOURCES  # <-- Import weekly links
+from app.services.resources import WEEKLY_RESOURCES  # <-- Import weekly links
 
 load_dotenv()
 
