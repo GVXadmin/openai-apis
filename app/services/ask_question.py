@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from app.services.resources import WEEKLY_RESOURCES 
 import html
 
+
 load_dotenv()
 
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
