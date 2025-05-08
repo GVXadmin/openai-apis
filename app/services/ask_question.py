@@ -5,7 +5,9 @@ from langchain_openai import AzureOpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from openai import AzureOpenAI
 from dotenv import load_dotenv
-from app.services.resources import WEEKLY_RESOURCES  # <-- Import weekly links
+from app.services.resources import WEEKLY_RESOURCES 
+import html
+
 
 load_dotenv()
 
@@ -115,9 +117,11 @@ async def process_question(
     week_key = extract_week_from_question(question)
     if week_key in WEEKLY_RESOURCES:
         resources = WEEKLY_RESOURCES[week_key]["resources"]
-        links_text = "\n\n Additional Resources for " + WEEKLY_RESOURCES[week_key]["title"] + ":\n"
+        links_text = f"\n\n<b>Additional Resources for {html.escape(WEEKLY_RESOURCES[week_key]['title'])}:</b><br>"
         for res in resources:
-            links_text += f"- {res['label']}: {res['link']}\n"
+            safe_label = html.escape(res["label"])
+            safe_link = html.escape(res["link"])
+            links_text += f'- {safe_label}: <a href="{safe_link}">{safe_link}</a><br>'
         answer_text += "\n\n" + links_text
 
     conversation_history.append(user_messages[0])
